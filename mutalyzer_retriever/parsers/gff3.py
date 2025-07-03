@@ -377,13 +377,15 @@ def _create_record_model(record, source=None):
     return model
 
 
-def parse(gff_content, source=None):
+def parse(gff_content, source=None, multi=False):
     gff_parser = GFFParser()
     gff = gff_parser.parse(io.StringIO(gff_content))
 
     records = []
     for record in gff:
-        records.append(_create_record_model(record, source))
+        single_record = _create_record_model(record, source)
+        records.append(single_record)
+    if multi:
+        return records
     if len(records) >= 1:
         return records[0]
-    # TODO: Decide what to do when there are multiple records.

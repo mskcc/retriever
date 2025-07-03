@@ -205,7 +205,7 @@ def retrieve_model(
                 return json_model["sequence"]["seq"]
 
 
-def retrieve_model_from_file(paths=[], is_lrg=False):
+def retrieve_model_from_file(paths=[], is_lrg=False, multi=False):
     """
 
     :arg list paths: Path towards the gff3, fasta, or lrg files.
@@ -225,13 +225,97 @@ def retrieve_model_from_file(paths=[], is_lrg=False):
     model = {}
     with open(gff3) as f:
         annotations = f.read()
-        model["annotations"] = parser.parse(annotations, "gff3")
+        model["annotations"] = parser.parse(annotations, "gff3", multi=multi)
 
-    with open(fasta) as f:
-        sequence = f.read()
-        model["sequence"] = parser.parse(sequence, "fasta")
+    if multi:
+        model["sequence"] = parser.parse(fasta, "fasta", multi=True)
+    else:
+        with open(fasta) as f:
+            sequence = f.read()
+            model["sequence"] = parser.parse(sequence, "fasta", multi=multi)
 
-    return model
+    if multi:
+        model_list = []
+        sequence_dict = {}
+        annotation_dict = {}
+        annotations_list = model["annotations"]
+        sequence_dict = model["sequence"]
+        annotation_dict = _setup_annotation_dict(annotations_list)
+        for single_transcript in annotation_dict:
+            annotation_elem = extract_feature_model(
+                annotation_dict[single_transcript], single_transcript, False, True, True
+            )[0]
+            sequence_chromosome = annotation_dict[single_transcript]["id"]
+            if sequence_chromosome in sequence_dict:
+                sequence = sequence_dict[sequence_chromosome].seq[
+                    int(annotation_elem["location"]["start"]["position"]) : int(
+                        annotation_elem["location"]["end"]["position"]
+                    )
+                ]
+                if "GRCh37" in sequence_dict[sequence_chromosome].description:
+                    annotated_with_assembly = _add_assembly_name(annotation_elem,"GRCh37")
+                elif "GRCh38" in sequence_dict[sequence_chromosome].description:
+                    annotated_with_assembly = _add_assembly_name(annotation_elem,"GRCh38")
+                else:
+                    annotated_with_assembly = annotation_elem
+                model = {
+                    "annotations": annotated_with_assembly,
+                    "sequence": {"seq":str(sequence)},
+                    "id": single_transcript,
+                }
+                model_list.append(model)
+        return model_list
+
+    return [model]
+
+
+def _setup_annotation_dict(annotation_list):
+    annotation_dict = {}
+    for single_annotation in annotation_list:
+        if "features" in single_annotation:
+            annotation_features = single_annotation["features"]
+            for single_feature in annotation_features:
+                feature_infos = _traverse_annotation_for_id(single_feature)
+                for feature_info in feature_infos:
+                    feature_id = feature_info["id"]
+                    location = feature_info["location"]
+                    annotation_dict[feature_id] = {
+                        "id": single_annotation["id"],
+                        "type": "record",
+                        "location": location,
+                        "features": [single_feature],
+                    }
+    return annotation_dict
+
+
+def _traverse_annotation_for_id(annotation_dict,annotation_type="mRNA"):
+
+    feature_info_list = []
+    if "type" in annotation_dict and annotation_dict["type"] == annotation_type:
+        feature_info_list.append({"id": annotation_dict["id"], "location": annotation_dict["location"]})
+
+    if "features" in annotation_dict:
+        features_list = annotation_dict["features"]
+        for feature in features_list:
+            if feature:
+                feature_info_list = feature_info_list + _traverse_annotation_for_id(
+                    feature
+                )
+    return feature_info_list
+
+def _add_assembly_name(annotation_dict,assembly_name):
+    annotation_qual_schema = parser.gff3.QUALIFIERS
+    assembly_name_qual = {key: qual_schemas for key, qual_schemas in annotation_qual_schema.items() if "assembly_name" in qual_schemas }
+    if "type" in annotation_dict and annotation_dict["type"] in assembly_name_qual:
+        annotation_dict["qualifiers"]["assembly_name"] = assembly_name
+    if "features" in annotation_dict:
+        features_list = annotation_dict["features"]
+        annotation_feature_list = []
+        for feature in features_list:
+            if feature:
+                annotation_feature_list.append(_add_assembly_name(feature,assembly_name))
+        annotation_dict["features"] = annotation_feature_list
+    return annotation_dict
 
 
 @lru_cache(maxsize=lru_cache_maxsize())

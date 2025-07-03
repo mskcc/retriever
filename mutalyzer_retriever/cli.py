@@ -82,6 +82,13 @@ def _args_parser():
     )
 
     parser_from_file.add_argument(
+        "--multi",
+        help="multiple records from file",
+        action="store_true",
+        default=False,
+    )
+
+    parser_from_file.add_argument(
         "--paths",
         help="both gff3 and fasta paths or just an lrg",
         nargs="+",
@@ -135,17 +142,21 @@ def parse_args(args=None):
 
 
 def _write_model(model, args):
+    if not args.id and "id" in model:
+        model_id = model.get("id")
+    else:
+        model_id = args.id
     if not Path(args.output).exists():
         Path(args.output).mkdir(parents=True)
     if args.split:
         if model.get("annotations"):
-            with open(f"{args.output}/{args.id}.annotations", "w", encoding="utf-8") as f:
+            with open(f"{args.output}/{model_id}.annotations", "w", encoding="utf-8") as f:
                 f.write(json.dumps(model["annotations"], indent=args.indent))
         if model.get("sequence"):
-            with open(f"{args.output}/{args.id}.sequence", "w") as f:
+            with open(f"{args.output}/{model_id}.sequence", "w") as f:
                 f.write(model["sequence"]["seq"])
     else:
-        with open(f"{args.output}/{args.id}", "w") as f:
+        with open(f"{args.output}/{model_id}", "w") as f:
             f.write(json.dumps(model, indent=args.indent))
 
 
@@ -157,9 +168,10 @@ def _output_model(model, args):
 
 
 def _from_file(args):
-    model = retrieve_model_from_file(paths=args.paths, is_lrg=args.is_lrg)
-    _output_model(model, args)
-
+    models = retrieve_model_from_file(paths=args.paths, is_lrg=args.is_lrg, multi=args.multi)
+    for model in models:
+        if model:
+            _output_model(model, args)
 
 def _retrieve_assemblies(args):
     retrieve_assemblies(

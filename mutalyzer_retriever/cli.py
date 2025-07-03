@@ -5,6 +5,7 @@ CLI entry point.
 import argparse
 import json
 import sys
+from pathlib import Path
 
 from . import usage, version
 from .related import get_cds_to_mrna, get_related
@@ -134,6 +135,8 @@ def parse_args(args=None):
 
 
 def _write_model(model, args):
+    if not Path(args.output).exists():
+        Path(args.output).mkdir(parents=True)
     if args.split:
         if model.get("annotations"):
             with open(f"{args.output}/{args.id}.annotations", "w", encoding="utf-8") as f:

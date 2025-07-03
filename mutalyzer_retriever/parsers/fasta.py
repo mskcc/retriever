@@ -11,4 +11,8 @@ def parse(fasta):
         raise ValueError
     if len(records) == 1:
         return records[0]
-    # TODO: What to do when there are multiple records?
+
+
+def parse_large(fasta):
+    print("Loading the fasta, this may take some time...")
+    return SeqIO.index(fasta, "fasta")

@@ -258,9 +258,18 @@ def retrieve_model_from_file(paths=[], is_lrg=False, multi=False):
                     annotated_with_assembly = _add_assembly_name(annotation_elem,"GRCh38")
                 else:
                     annotated_with_assembly = annotation_elem
+                reverse = False
+                if "strand" in annotated_with_assembly["location"]:
+                    strand = annotated_with_assembly["location"].pop("strand")
+                    if str(strand) == "-1":
+                        reverse = True
+                if reverse:
+                    sequence_str = str(sequence.reverse_complement())
+                else:
+                    sequence_str = str(sequence)
                 model = {
                     "annotations": annotated_with_assembly,
-                    "sequence": {"seq":str(sequence)},
+                    "sequence": {"seq":sequence_str},
                     "id": single_transcript,
                 }
                 model_list.append(model)
